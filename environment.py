@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from scipy.interpolate import CubicSpline
-
-
+from gym import spaces
 class MultiMountainsEnv:
     def __init__(
         self,
@@ -29,13 +28,28 @@ class MultiMountainsEnv:
 
         self.ax = None
         self.fig = None
+        
+        self.low = np.array([self.x.min(), -0.07])
+        self.high = np.array([self.x.max(), +0.07])
+        
+        self.action_space = spaces.Discrete(3)
+        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
+        
+        self.counter = 0
 
-        self.state = (self.x[1], 0.0)
 
     def df(self, x: float):
         f = self.f
         d = self.delta
         return (f(x + d) - f(x)) / d
+    
+    def reset(self):
+        self.counter = 0
+        x = np.linspace(self.x[0], self.x[2], 1024)
+        idx = np.argmin(self.f(x))
+        self.state = (x[idx], 0)
+        return np.array(self.state)
+        
 
     def init_render(self):
         if not ((self.fig is None) and (self.ax is None)):
@@ -54,10 +68,10 @@ class MultiMountainsEnv:
         self.ax.set_xlim(x.min(), x.max())
         self.ax.set_xticks([])
         
-        self.ax.set_ylim(y.min() - 2, y.max() + 2)
+        self.ax.set_ylim(y.min(), y.max())
         self.ax.set_yticks([])
         
-        self.ball = Circle((0, 0), 0.25)
+        self.ball = Circle((0, 0), 0.0125)
         self.ax.add_patch(self.ball)
         self.ax.patches[0].set_color("red")
 
@@ -71,6 +85,7 @@ class MultiMountainsEnv:
         
 
     def step(self, action: int):
+        self.counter += 1
         x, v = self.state
         dy = self.df(x)
         delta_x = self.delta
@@ -78,8 +93,8 @@ class MultiMountainsEnv:
         mag = np.sqrt(delta_x ** 2 + delta_y ** 2)
         Tx = delta_x / mag
         Ty = delta_y / mag
-        At = np.dot([0, -self.g], [Tx, Ty]) + (action - 1) * self.F
-        v = v + At * self.dt 
+        At = np.dot([0, -self.g], [Tx, Ty]) 
+        v = v + At * self.dt + (action - 1) * self.F
         x = x + v * self.dt * Tx
         if x < self.x.min():
             x = self.x.min()
@@ -87,10 +102,13 @@ class MultiMountainsEnv:
 
         self.state = (x, v)
 
-        return np.array(self.state), self.reward, self.done(), {}
+        return np.array(self.state), self.reward(), self.done(), {}
 
     def done(self):
-        return False
+        return self.counter == 200 or self.is_goal_reached()
 
     def reward(self):
         return -1
+    
+    def is_goal_reached(self):
+        return self.state[0] >= self.x[-1]
