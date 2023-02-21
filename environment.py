@@ -4,7 +4,6 @@ from matplotlib.patches import Circle
 from scipy.interpolate import CubicSpline
 from gym import spaces
 
-from sidechannels.custom_mountaincar import AngleModifiedDiscreteMountainCar
 
 
 class MultiMountainsEnv:
