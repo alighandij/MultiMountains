@@ -11,9 +11,10 @@ class MultiMountainsEnv:
     def __init__(
         self,
         angles: tuple[int],
-        gravity: float = 9.8,
-        force: float = 4,
-        dt: float = 0.04,  # FPS = 25 -> dt = 1 / 25
+        max_step: int = 500,
+        gravity: float = 0.0025,
+        force: float = 1e-3,
+        dt: float = 1,
         delta: float = 1e-12,
     ) -> None:
         self.g = gravity
@@ -34,14 +35,16 @@ class MultiMountainsEnv:
         self.ax = None
         self.fig = None
 
-        self.low = np.array([self.x.min(), -25])
-        self.high = np.array([self.x.max(), +25])
+        self.max_speed = 0.07
+        self.low = np.array([self.x.min(), -self.max_speed])
+        self.high = np.array([self.x.max(), +self.max_speed])
 
         self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(
             self.low, self.high, dtype=np.float32)
 
         self.counter = 0
+        self.max_step = max_step
 
     def df(self, x: float):
         f = self.f
@@ -70,16 +73,14 @@ class MultiMountainsEnv:
 
         self.fig, self.ax = plt.subplots()
         self.fig.canvas.set_window_title("Multi Mountains")
-        self.fig.tight_layout()
+        # self.fig.tight_layout()
         self.ax.scatter(self.x, self.y, c="g")
         self.ax.plot(x, y, c="k")
-        # self.ax.plot(x, self.df(y), c="r")
-
+        self.ax.set_title(f"Angles = {self.angles}")
         self.ax.set_xlim(x.min(), x.max())
-        # self.ax.set_xticks([])
+        self.ax.set_xticks([])
 
-        # self.ax.set_ylim(y.min() - r * 2, y.max() + r * 2)
-        # self.ax.set_yticks([])
+        self.ax.set_yticks([])
         self.ax.grid()
         self.ball = Circle((0, 0), r, zorder=2, color="red")
         self.ax.add_patch(self.ball)
@@ -94,27 +95,22 @@ class MultiMountainsEnv:
 
     def step(self, action: int):
         x, v = self.state
-        dy = self.df(x)
-        delta_x = self.delta
-        delta_y = delta_x * dy
-        mag = np.sqrt(delta_x ** 2 + delta_y ** 2)
-        Tx = delta_x / mag
-        Ty = delta_y / mag
-        At = np.dot([0, -self.g], [Tx, Ty])
-        v = v + At * self.dt + (action - 1) * self.F
-        x = x + v * self.dt * Tx
-
-        if x < self.x.min():
-            x = self.x.min()
+        v = v + (action - 1) * self.F - self.df(x) * self.g
+        v = np.clip(v, -self.max_speed, self.max_speed)
+        
+        x = x + v
+        x = np.clip(x, self.x.min(), self.x.max())
+        
+        if x == self.x.min() and v < 0:
             v = 0
 
-        self.counter += 1
         self.state = (x, v)
+        self.counter += 1
 
         return np.array(self.state), self.reward(), self.done(), {}
 
     def done(self):
-        return self.counter == 500 or self.is_goal_reached()
+        return self.counter == self.max_step or self.is_goal_reached()
 
     def reward(self):
         return -1
@@ -139,7 +135,7 @@ class MultiMountainsEnv:
             (x2, self.h(x2)),
             (0.5, self.calc_height(angle))
         )
-        
+
     def calc_points(self, angles: tuple[float]) -> tuple:
         points = []
         for i, angle in enumerate(angles):
@@ -149,15 +145,10 @@ class MultiMountainsEnv:
                 if i == 0:
                     points.append((x, y))
                     continue
-                # I > 1
                 if j == 0:
                     continue
-                lst_x = points[idx][0]
-                lst_y = points[idx][1]
-                off_x = lst_x - pts[0][0]
-                off_y = lst_y - pts[0][1]
+                off_x = points[idx][0] - pts[0][0]
+                off_y = points[idx][1] - pts[0][1]
                 points.append((x + off_x, y + off_y))
-                
-                
-        return points         
 
+        return points
