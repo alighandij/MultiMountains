@@ -1,9 +1,9 @@
+import keyboard
 import numpy as np
+from gym import spaces
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from scipy.interpolate import CubicSpline
-from gym import spaces
-
 
 
 class MultiMountainsEnv:
@@ -13,13 +13,20 @@ class MultiMountainsEnv:
         max_step: int = 500,
         gravity: float = 0.0025,
         force: float = 1e-3,
-        dt: float = 1,
         delta: float = 1e-12,
     ) -> None:
+        """_summary_
+
+        Args:
+            angles (tuple[int]): list of angles in order
+            max_step (int, optional): Maximum Number of actions for each episode Defaults to 500.
+            gravity (float, optional): Gravity. Defaults to 0.0025.
+            force (float, optional): Force of each action. Defaults to 1e-3.
+            delta (float, optional): dx for df/dx. Defaults to 1e-12.
+        """
         self.g = gravity
         self.F = force
 
-        self.dt = dt
         self.delta = delta
         self.angles = angles
         self.points = np.array(self.calc_points(angles))
@@ -72,7 +79,6 @@ class MultiMountainsEnv:
 
         self.fig, self.ax = plt.subplots()
         self.fig.canvas.set_window_title("Multi Mountains")
-        # self.fig.tight_layout()
         self.ax.scatter(self.x, self.y, c="g")
         self.ax.plot(x, y, c="k")
         self.ax.set_title(f"Angles = {self.angles}")
@@ -100,8 +106,8 @@ class MultiMountainsEnv:
         x = x + v
         x = np.clip(x, self.x.min(), self.x.max())
         
-        if x == self.x.min() and v < 0:
-            v = 0
+        if x <= self.x.min() and v < 0:
+            v = 1e-2
 
         self.state = (x, v)
         self.counter += 1
@@ -151,3 +157,10 @@ class MultiMountainsEnv:
                 points.append((x + off_x, y + off_y))
 
         return points
+
+    def get_user_action(self) -> int:
+        if keyboard.is_pressed("a"):
+            return 0
+        if keyboard.is_pressed("b"):
+            return 2
+        return 1
