@@ -100,6 +100,8 @@ class MultiMountainsEnv:
 
     def step(self, action: int):
         x, v = self.state
+        p = x
+        
         v = v + (action - 1) * self.F - self.df(x) * self.g
         v = np.clip(v, -self.max_speed, self.max_speed)
         
@@ -108,11 +110,18 @@ class MultiMountainsEnv:
         
         if x <= self.x.min() and v < 0:
             v = 1e-2
-
+        
+        reward = -1
+        if np.isclose(x, self.x).any():
+            if x > p:
+                reward = +5
+            else:
+                reward = -5
+        
         self.state = (x, v)
         self.counter += 1
 
-        return np.array(self.state), self.reward(), self.done(), {}
+        return np.array(self.state), reward, self.done(), {}
 
     def done(self):
         return self.counter == self.max_step or self.is_goal_reached()
