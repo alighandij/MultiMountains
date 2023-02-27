@@ -32,7 +32,9 @@ class MultiMountainsEnv:
         self.points = np.array(self.calc_points(angles))
 
         self.x = self.points[:, 0]
+        self.x_peaks = self.x[::2][1:]
         self.y = self.points[:, 1]
+        self.y_peaks = self.y[::2][1:]
         self.f = CubicSpline(self.x, self.y, bc_type="clamped")
 
         self.x_curve = np.linspace(self.x.min(), self.x.max(), 1024)
@@ -79,16 +81,16 @@ class MultiMountainsEnv:
 
         self.fig, self.ax = plt.subplots()
         self.fig.canvas.set_window_title("Multi Mountains")
-        self.ax.scatter(self.x, self.y, c="g")
         self.ax.plot(x, y, c="k")
-        self.ax.set_title(f"Angles = {self.angles}")
-        self.ax.set_xlim(x.min(), x.max())
-        self.ax.set_xticks([])
 
-        self.ax.set_yticks([])
-        self.ax.grid()
         self.ball = Circle((0, 0), r, zorder=2, color="red")
         self.ax.add_patch(self.ball)
+        
+        self.ax.set_title(f"Angles = {self.angles}")
+        self.ax.set_xlim(x.min(), x.max())
+        self.ax.set_yticks([])
+        self.ax.set_xticks([])
+        self.ax.grid()
 
     def render(self):
         self.init_render()
@@ -111,23 +113,22 @@ class MultiMountainsEnv:
         if x <= self.x.min() and v < 0:
             v = 1e-2
         
-        reward = -1
-        if np.isclose(x, self.x).any():
-            if x > p:
-                reward = +5
-            else:
-                reward = -5
-        
         self.state = (x, v)
         self.counter += 1
 
-        return np.array(self.state), reward, self.done(), {}
+        return np.array(self.state), self.reward(p, x), self.done(), {}
 
+    def reward(self, p: float, x: float) -> float:
+        if np.logical_and(x > self.x_peaks, p < self.x_peaks).any():
+            return +5
+        
+        if np.logical_and(x < self.x_peaks, p > self.x_peaks).any():
+            return -5
+        
+        return -1
+    
     def done(self):
         return self.counter == self.max_step or self.is_goal_reached()
-
-    def reward(self):
-        return -1
 
     def is_goal_reached(self):
         return self.state[0] >= self.x[-1]
